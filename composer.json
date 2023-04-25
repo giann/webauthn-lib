@@ -1,10 +1,10 @@
 {
-    "name": "web-auth/webauthn-lib",
+    "name": "giann/webauthn-lib",
     "type": "library",
     "license": "MIT",
-    "description": "FIDO2/Webauthn Support For PHP",
+    "description": "Fork of web-auth/webauthn-lib that supports Android FIDO2 attestations",
     "keywords": ["FIDO", "FIDO2", "webauthn"],
-    "homepage": "https://github.com/web-auth",
+    "homepage": "https://github.com/giann/webauthn-lib",
     "authors": [
         {
             "name": "Florent Morselli",
@@ -45,5 +45,8 @@
         "web-token/jwt-signature-algorithm-rsa": "Mandatory for the AndroidSafetyNet Attestation Statement support",
         "web-token/jwt-signature-algorithm-ecdsa": "Recommended for the AndroidSafetyNet Attestation Statement support",
         "web-token/jwt-signature-algorithm-eddsa": "Recommended for the AndroidSafetyNet Attestation Statement support"
+    },
+    "replace": {
+        "web-auth/webauthn-lib": "*"
     }
 }
