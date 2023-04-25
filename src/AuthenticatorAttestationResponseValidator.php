@@ -141,17 +141,48 @@ class AuthenticatorAttestationResponseValidator
             $rpId = $publicKeyCredentialCreationOptions->getRp()->getId() ?? $request->getUri()->getHost();
             $facetId = $this->getFacetId($rpId, $publicKeyCredentialCreationOptions->getExtensions(), $authenticatorAttestationResponse->getAttestationObject()->getAuthData()->getExtensions());
 
-            $parsedRelyingPartyId = parse_url($C->getOrigin());
-            Assertion::isArray($parsedRelyingPartyId, sprintf('The origin URI "%s" is not valid', $C->getOrigin()));
-            Assertion::keyExists($parsedRelyingPartyId, 'scheme', 'Invalid origin rpId.');
-            $clientDataRpId = $parsedRelyingPartyId['host'] ?? '';
-            Assertion::notEmpty($clientDataRpId, 'Invalid origin rpId.');
-            $rpIdLength = mb_strlen($facetId);
-            Assertion::eq(mb_substr('.'.$clientDataRpId, -($rpIdLength + 1)), '.'.$facetId, 'rpId mismatch.');
+            $origin = $C->getOrigin();
 
-            if (!in_array($facetId, $securedRelyingPartyId, true)) {
-                $scheme = $parsedRelyingPartyId['scheme'] ?? '';
-                Assertion::eq('https', $scheme, 'Invalid scheme. HTTPS required.');
+            // Android app origin
+            if (str_starts_with($origin, 'android:apk-key-hash:')) {
+                $apkKeyHash = base64_decode(substr($origin, 21));
+
+                // Get https://<relying-party>/.well-known/assetlinks.json
+                $assetlinksUrl = 'https://' . $rpId . '/.well-known/assetlinks.json';
+                $assetlinks = CollectedAssetLinks::createFromJson(@file_get_contents($assetlinksUrl) ?: '');
+
+                // Check that it contains this apk key hash
+                $foundMatchingKey = false;
+                foreach ($assetlinks->getAssetLinks() as $assetLink) {
+                    if ($assetLink->getTargetNamespace() === 'android_app' && $assetLink->getTargetPackageName() === $C->getAndroidPackageName()) {
+                        foreach ($assetLink->getTargetSha256CertFingerPrints() ?? [] as $fingerprint) {
+                            $hex = explode(':', $fingerprint);
+                            $bytes = array_map(fn ($e) => hexdec($e), $hex);
+                            $bin = pack('C' . count($bytes), ...$bytes);
+
+                            $foundMatchingKey = $bin === $apkKeyHash;
+
+                            if ($foundMatchingKey) {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                Assertion::true($foundMatchingKey, 'No matching apk signing certificate signature found');
+            } else {
+                $parsedRelyingPartyId = parse_url($C->getOrigin());
+                Assertion::isArray($parsedRelyingPartyId, sprintf('The origin URI "%s" is not valid', $C->getOrigin()));
+                Assertion::keyExists($parsedRelyingPartyId, 'scheme', 'Invalid origin rpId.');
+                $clientDataRpId = $parsedRelyingPartyId['host'] ?? '';
+                Assertion::notEmpty($clientDataRpId, 'Invalid origin rpId.');
+                $rpIdLength = mb_strlen($facetId);
+                Assertion::eq(mb_substr('.'.$clientDataRpId, -($rpIdLength + 1)), '.'.$facetId, 'rpId mismatch.');
+
+                if (!in_array($facetId, $securedRelyingPartyId, true)) {
+                    $scheme = $parsedRelyingPartyId['scheme'] ?? '';
+                    Assertion::eq('https', $scheme, 'Invalid scheme. HTTPS required.');
+                }
             }
 
             /** @see 7.1.6 */
@@ -263,7 +294,8 @@ class AuthenticatorAttestationResponseValidator
             //No attestation is asked. We shall ensure that the data is anonymous.
             if (
                 '00000000-0000-0000-0000-000000000000' === $aaguid
-                && (AttestationStatement::TYPE_NONE === $attestationStatement->getType() || AttestationStatement::TYPE_SELF === $attestationStatement->getType())) {
+                && (AttestationStatement::TYPE_NONE === $attestationStatement->getType() || AttestationStatement::TYPE_SELF === $attestationStatement->getType())
+            ) {
                 $this->logger->debug('The Attestation Statement is anonymous.');
                 $this->checkCertificateChain($attestationStatement, null);
 

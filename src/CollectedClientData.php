@@ -49,6 +49,11 @@ class CollectedClientData
     private $origin;
 
     /**
+     * @var [type]
+     */
+    private $androidPackageName;
+
+    /**
      * @var mixed[]|null
      */
     private $tokenBinding;
@@ -62,6 +67,7 @@ class CollectedClientData
         $this->challenge = $this->findData($data, 'challenge', true, true);
         $this->origin = $this->findData($data, 'origin');
         $this->tokenBinding = $this->findData($data, 'tokenBinding', false);
+        $this->androidPackageName = $this->findData($data, 'androidPackageName', false);
         $this->rawData = $rawData;
         $this->data = $data;
     }
@@ -88,6 +94,11 @@ class CollectedClientData
     public function getOrigin(): string
     {
         return $this->origin;
+    }
+
+    public function getAndroidPackageName(): ?string
+    {
+        return $this->androidPackageName;
     }
 
     public function getTokenBinding(): ?TokenBinding
