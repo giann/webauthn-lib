@@ -155,16 +155,48 @@ class AuthenticatorAssertionResponseValidator
             /** @see 7.2.9 */
             $rpId = $publicKeyCredentialRequestOptions->getRpId() ?? $request->getUri()->getHost();
             $facetId = $this->getFacetId($rpId, $publicKeyCredentialRequestOptions->getExtensions(), $authenticatorAssertionResponse->getAuthenticatorData()->getExtensions());
-            $parsedRelyingPartyId = parse_url($C->getOrigin());
-            Assertion::isArray($parsedRelyingPartyId, 'Invalid origin');
-            if (!in_array($facetId, $securedRelyingPartyId, true)) {
-                $scheme = $parsedRelyingPartyId['scheme'] ?? '';
-                Assertion::eq('https', $scheme, 'Invalid scheme. HTTPS required.');
+
+            // Android app origin
+            $origin = $C->getOrigin();
+
+            if (str_starts_with($origin, 'android:apk-key-hash:')) {
+                $apkKeyHash = base64_decode(substr($origin, 21));
+
+                // Get https://<relying-party>/.well-known/assetlinks.json
+                $assetlinksUrl = 'https://' . $rpId . '/.well-known/assetlinks.json';
+                $assetlinks = CollectedAssetLinks::createFromJson(@file_get_contents($assetlinksUrl) ?: '');
+
+                // Check that it contains this apk key hash
+                $foundMatchingKey = false;
+                foreach ($assetlinks->getAssetLinks() as $assetLink) {
+                    if ($assetLink->getTargetNamespace() === 'android_app' && $assetLink->getTargetPackageName() === $C->getAndroidPackageName()) {
+                        foreach ($assetLink->getTargetSha256CertFingerPrints() ?? [] as $fingerprint) {
+                            $hex = explode(':', $fingerprint);
+                            $bytes = array_map(fn ($e) => hexdec($e), $hex);
+                            $bin = pack('C' . count($bytes), ...$bytes);
+
+                            $foundMatchingKey = $bin === $apkKeyHash;
+
+                            if ($foundMatchingKey) {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                Assertion::true($foundMatchingKey, 'No matching apk signing certificate signature found');
+            } else {
+                $parsedRelyingPartyId = parse_url($C->getOrigin());
+                Assertion::isArray($parsedRelyingPartyId, 'Invalid origin');
+                if (!in_array($facetId, $securedRelyingPartyId, true)) {
+                    $scheme = $parsedRelyingPartyId['scheme'] ?? '';
+                    Assertion::eq('https', $scheme, 'Invalid scheme. HTTPS required.');
+                }
+                $clientDataRpId = $parsedRelyingPartyId['host'] ?? '';
+                Assertion::notEmpty($clientDataRpId, 'Invalid origin rpId.');
+                $rpIdLength = mb_strlen($facetId);
+                Assertion::eq(mb_substr('.' . $clientDataRpId, - ($rpIdLength + 1)), '.' . $facetId, 'rpId mismatch.');
             }
-            $clientDataRpId = $parsedRelyingPartyId['host'] ?? '';
-            Assertion::notEmpty($clientDataRpId, 'Invalid origin rpId.');
-            $rpIdLength = mb_strlen($facetId);
-            Assertion::eq(mb_substr('.'.$clientDataRpId, -($rpIdLength + 1)), '.'.$facetId, 'rpId mismatch.');
 
             /** @see 7.2.10 */
             if (null !== $C->getTokenBinding()) {
