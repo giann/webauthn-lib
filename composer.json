@@ -2,7 +2,7 @@
     "name": "giann/webauthn-lib",
     "type": "library",
     "license": "MIT",
-    "description": "Fork of web-auth/webauthn-lib that supports Android FIDO2 attestations",
+    "description": "Fork of web-auth/webauthn-lib that supports Android FIDO2/Passkey attestations",
     "keywords": ["FIDO", "FIDO2", "webauthn"],
     "homepage": "https://github.com/giann/webauthn-lib",
     "authors": [
@@ -45,8 +45,5 @@
         "web-token/jwt-signature-algorithm-rsa": "Mandatory for the AndroidSafetyNet Attestation Statement support",
         "web-token/jwt-signature-algorithm-ecdsa": "Recommended for the AndroidSafetyNet Attestation Statement support",
         "web-token/jwt-signature-algorithm-eddsa": "Recommended for the AndroidSafetyNet Attestation Statement support"
-    },
-    "replace": {
-        "web-auth/webauthn-lib": "*"
     }
 }
